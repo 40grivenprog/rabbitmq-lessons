@@ -1,0 +1,16 @@
+Тут мы рассмотрим тип exchange topics
+
+в отличие от роутинг где нам нужно полное совпадение между routing key паблишера и субскрайбера
+тут можно использовать что-то наподобие регулярного выражения и routing_key это ключ из нескольких слов разделённых точкой("lazy.orange.rabbit")
+Пример
+Паблишер публикует сообщения в exchange с ключом "lazy.orange.rabbit" - у нас есть несколько воркеров
+первый читает всё об оранжевых кроликах *.orange.rabbit
+второй всё о ленивых животных "lazy.#"
+
+worker 1:
+go run main.go "#"
+worker 2:
+go run main.go "kern.*"
+
+sender:
+go run main.go "kern.critical" "A critical kernel error"

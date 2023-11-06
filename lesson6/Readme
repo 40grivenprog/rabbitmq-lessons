@@ -1,0 +1,53 @@
+В рамках этого урока мы реализовали рпс
+Разберём на примере
+У нас есть rpc_server rpc_client
+
+Как работает rpc_client
+1) Создаёт канал
+2) Сам подписывается на свой же канал
+3) Публикует в этот канал сообщение состоящие из цифры полученной как аргумент
+Помимо сообщение тут также сетается CorrelationId генерирующийся рандомно и реплай_ту с тем же каналом куда мы записали
+
+err = ch.PublishWithContext(ctx,
+		"",          // exchange
+		"rpc_queue", // routing key
+		false,       // mandatory
+		false,       // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			CorrelationId: corrId,
+			ReplyTo:       q.Name,
+			Body:          []byte(strconv.Itoa(n)),
+		})
+4) дальше запускается цикл чтения из канала и как только мы получаем сообщение с тем же CorrelationId которое мы послали цикл чтения заканчивается
+
+Как работает rpc_server
+1) базовое создание канала и подписка на него
+2) дальше перманентное чтение сообщений из канала
+3) из канала мы получаем число исходя из которого считаем числа фибоначи и дальше уже отправляем сообщение обратно в тот же канал
+с CorrelationId которое было в сообщение
+go func() {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    for d := range msgs {
+        n, err := strconv.Atoi(string(d.Body))
+        failOnError(err, "Failed to convert body to integer")
+
+        log.Printf(" [.] fib(%d)", n)
+        response := fib(n)
+
+        err = ch.PublishWithContext(ctx,
+            "",        // exchange
+            d.ReplyTo, // routing key
+            false,     // mandatory
+            false,     // immediate
+            amqp.Publishing{
+                ContentType:   "text/plain",
+                CorrelationId: d.CorrelationId,
+                Body:          []byte(strconv.Itoa(response)),
+            })
+        failOnError(err, "Failed to publish a message")
+
+        d.Ack(false)
+    }
+}()

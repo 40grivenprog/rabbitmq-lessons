@@ -1,0 +1,59 @@
+Exchange
+
+Proucer:
+Продюсер не должен отправлять сообщения напрямую в какой-то канал(очередь) вместо этого мы создаём Exchange
+sender:
+err = ch.ExchangeDeclare(
+	"logs",   // name
+	"fanout", // type
+	true,     // durable
+	false,    // auto-deleted
+	false,    // internal
+	false,    // no-wait
+	nil,      // arguments
+)
+fanout - это тип который кидает все сообщения по всем каналам
+и посылаем сообщения туда
+
+err = ch.PublishWithContext(ctx,
+	"logs", // exchange
+	"",     // routing key
+	false,  // mandatory
+	false,  // immediate
+	amqp.Publishing{
+		ContentType: "text/plain",
+		Body:        []byte(body),
+})
+
+Consumer:
+В клиенте amqp, когда мы указываем имя очереди в виде пустой строки, мы создаем  очередь со сгенерированным именем: q.Name = amq.gen-JzTY20BRgKO-HjmUJj0wLg
+q, err := ch.QueueDeclare(
+	"",    // name
+	false, // durable
+	false, // delete when unused
+	true,  // exclusive
+	false, // no-wait
+	nil,   // arguments
+)
+мы должны создать Exchange
+err = ch.ExchangeDeclare(
+		"logs",   // name
+		"fanout", // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
+	)
+Также мы должны создать биндер который делаем маппинг для очереди и exchange
+the queue is interested in messages from this exchange
+err = ch.QueueBind(
+  q.Name, // queue name
+  "",     // routing key
+  "logs", // exchange
+  false,
+  nil,
+)
+
+дальше просто подписаться на соданную очередь и ждать пока exchange что-то туда положит
+

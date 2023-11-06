@@ -1,0 +1,57 @@
+docker run -d --hostname my-rabbit --name some-rabbit -p 15672:15672 -p 5672:5672 rabbitmq:3-management
+
+AUTO-ACK
+Представим ситуацию когда один воркер умер до того как выполнил задачу. Тогда получается что её больше не будет в очереди и никто её так
+и не выполнит! Что бы хэндлить такие кейсы есть механизм ack. Благодаря этому механизму мы говорим рэбиту что задача была выполнена и её можно
+удалить из очереди. Если же воркер умер - эта задача будет передана другому свободну воркеру.
+Для реализации ставим в канал auto-ack false
+msgs, err := ch.Consume(
+    q.Name, // queue
+    "",     // consumer
+    false,   // auto-ack
+    false,  // exclusive
+    false,  // no-local
+    false,  // no-wait
+    nil,    // args
+)
+А после выполнения задачи отправляем туда значение мануально(d.Ack(false))
+Что бы протестировать можно создать задачу на много секунде(секунда - точка в посылаемой стринге) а затем отключить воркер который её получил
+и убедиться что она перейдет другому воркеру(30 минут).
+
+DURABLE
+это свойство помогает нам в том случае, когда в канале есть сообщение но рэбит отключился- если стоят нужные настройки то сообщения сохранятся
+и после перезагрузки будут доступны
+настройки
+sender
+1)  q, err := ch.QueueDeclare(
+        "task_queue", // name
+        true,         // durable
+        false,        // delete when unused
+        false,        // exclusive
+        false,        // no-wait
+        nil,          // arguments
+    )
+2) amqp.Publishing{
+			DeliveryMode: amqp.Persistent, !!!!!
+			ContentType:  "text/plain",
+			Body:         []byte(body),
+		})
+woker:
+q, err := ch.QueueDeclare(
+		"task_queue", // name
+		true,   // durable
+		false,   // delete when unused
+		false,   // exclusive
+		false,   // no-wait
+		nil,     // arguments
+	)
+
+
+FAIR DISPATCH
+достигается Благодаря настройке воркера
+err = ch.Qos(
+		1,     // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+эта настройка говорит сл - если воркер занят хотя бы одной таской не отдавать ему новую а ждать свободного воркера
